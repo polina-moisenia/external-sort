@@ -29,7 +29,5 @@ To build and run this application, follow these steps:
 - `Program.cs`: Entry point of the application.
 - `sort-console-app.csproj`: Project configuration file.
 - `QuickSorter.cs`: Implements the quick sort algorithm.
-- `FileProcessor.cs`: Handles reading and writing files.
-- `Utils.cs`: Contains utility functions.
 - `MergeSorter.cs`: Merges sorted chunks into a single sorted file.
 - `ChunkSorter.cs`: Splits the input file into chunks and sorts them.
