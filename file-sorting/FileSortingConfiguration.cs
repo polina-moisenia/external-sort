@@ -15,24 +15,35 @@ public class FileSortingConfiguration
     public int MaxParallelWrite { get; }
 
     public FileSortingConfiguration(string inputFile, string outputFile,
-                      int chunkSize = 1_000_000,
-                      int bufferSize = 1024 * 1024 * 10,
-                      int outputBufferSize = 10_000,
-                      int mergeDegree = 32)
+                      int chunkSize,
+                      int bufferSize,
+                      int outputBufferSize,
+                      int mergeDegree)
     {
         InputFile = inputFile;
         OutputFile = outputFile;
-        TempDirectory = Path.Combine(Path.GetDirectoryName(outputFile), "output_chunks");
+        string dir = Path.GetDirectoryName(outputFile) ?? ".";
+        TempDirectory = Path.Combine(dir, "output_chunks");
         Directory.CreateDirectory(TempDirectory);
 
         ChunkSize = chunkSize;
         BufferSize = bufferSize;
         OutputBufferSize = outputBufferSize;
         MergeDegree = mergeDegree;
+
         BatchLineCount = Math.Min(10_000, chunkSize);
         PrefetchBufferSize = BatchLineCount;
 
         MaxParallelSort = Environment.ProcessorCount;
-        MaxParallelWrite = 4;
+        MaxParallelWrite = 6;
+    }
+
+    public static FileSortingConfiguration CreateConfiguration(string inputFile, string outputFile)
+    {
+        FileInfo fi = new FileInfo(inputFile);
+        long fileSize = fi.Length; // в байтах
+
+
+        return new FileSortingConfiguration(inputFile, outputFile, 500_000, 1024 * 1024 * 32, 10_000, 32);
     }
 }

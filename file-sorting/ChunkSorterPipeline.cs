@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading.Tasks.Dataflow;
 using FileSorting.IO;
 
@@ -12,11 +13,12 @@ public class ChunkSorterPipeline
         _config = config;
     }
 
-    public async Task SplitAndSortChunksAsync()
+    public async Task SplitAndSortChunksAsync(CancellationToken cancellationToken = default)
     {
+        Stopwatch sw = Stopwatch.StartNew();
+
         var sortBlock = new TransformBlock<(int, List<string>), (int, List<FileLineRecord>)>(chunk =>
         {
-
             var records = new List<FileLineRecord>(chunk.Item2.Count);
             foreach (var line in chunk.Item2)
             {
@@ -31,7 +33,11 @@ public class ChunkSorterPipeline
         {
             string chunkFile = Path.Combine(_config.TempDirectory, $"chunk_{chunk.Item1}.txt");
             await using var writer = new BufferedWriter(chunkFile, _config.BufferSize);
-            await writer.WriteLinesAsync(chunk.Item2).ConfigureAwait(false);
+            foreach (var record in chunk.Item2)
+            {
+                await writer.WriteLineAsync(record.ToString()).ConfigureAwait(false);
+            }
+            await writer.FlushAsync().ConfigureAwait(false);
         }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = _config.MaxParallelWrite });
 
         sortBlock.LinkTo(writeBlock, new DataflowLinkOptions { PropagateCompletion = true });
@@ -41,9 +47,9 @@ public class ChunkSorterPipeline
         var chunk = new List<string>(_config.ChunkSize);
         string? line;
 
-        while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null)
+        while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null && !cancellationToken.IsCancellationRequested)
         {
-            chunk.Add(line.TrimEnd('\r'));
+            chunk.Add(line);
             if (chunk.Count >= _config.ChunkSize)
             {
                 sortBlock.Post((chunkIndex++, chunk));
@@ -53,6 +59,9 @@ public class ChunkSorterPipeline
         if (chunk.Count > 0) sortBlock.Post((chunkIndex++, chunk));
 
         sortBlock.Complete();
+        Console.WriteLine($"File was read in {sw.Elapsed.TotalSeconds:F2} seconds.");
+
         await writeBlock.Completion.ConfigureAwait(false);
+        Console.WriteLine($"Chunks were created in {sw.Elapsed.TotalSeconds:F2} seconds.");
     }
 }

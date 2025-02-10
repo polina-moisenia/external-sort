@@ -14,12 +14,12 @@ public class BatchWriter : IAsyncDisposable
 
     public async Task WriteAsync<T>(IEnumerable<T> batch)
     {
-        await _writer.WriteAsync(string.Join('\n', batch.Select(x => x.ToString())) + '\n');
+        await _writer.WriteAsync(string.Join('\n', batch.Select(x => x.ToString())) + '\n').ConfigureAwait(false);
     }
 
     public async ValueTask DisposeAsync()
     {
-        await _writer.FlushAsync();
-        await _writer.DisposeAsync();
+        await _writer.FlushAsync().ConfigureAwait(false);
+        await _writer.DisposeAsync().ConfigureAwait(false);
     }
 }

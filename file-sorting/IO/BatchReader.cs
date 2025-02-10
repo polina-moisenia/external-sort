@@ -32,20 +32,21 @@ public class BatchReader : IAsyncDisposable
     {
         using var stream = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.Read, _bufferSize, useAsync: true);
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: _bufferSize);
-        
+
+        var batch = new List<string>(_batchLineCount);
         while (!reader.EndOfStream)
         {
-            var batch = new List<string>(_batchLineCount);
+            batch.Clear();
             for (int i = 0; i < _batchLineCount && !reader.EndOfStream; i++)
             {
-                string? line = await reader.ReadLineAsync();
+                string? line = await reader.ReadLineAsync().ConfigureAwait(false);
                 if (line is not null)
                     batch.Add(line);
             }
             if (batch.Count > 0)
-                await ProcessBatchAsync(batch);
+                await ProcessBatchAsync(batch).ConfigureAwait(false);
         }
-        
+
         _recordChannel.Writer.Complete();
     }
 
@@ -62,13 +63,13 @@ public class BatchReader : IAsyncDisposable
 
         foreach (var record in results)
         {
-            await _recordChannel.Writer.WriteAsync(record);
+            await _recordChannel.Writer.WriteAsync(record).ConfigureAwait(false);
         }
     }
 
     public async ValueTask DisposeAsync()
     {
         if (_readingTask is not null)
-            await _readingTask;
+            await _readingTask.ConfigureAwait(false);
     }
 }

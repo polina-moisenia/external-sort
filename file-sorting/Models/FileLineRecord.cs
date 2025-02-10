@@ -1,71 +1,66 @@
+using System.Globalization;
+
 namespace FileSorting.IO;
-
-public struct FileLineRecord : IComparable<FileLineRecord>
+public readonly struct FileLineRecord : IComparable<FileLineRecord>
 {
-    public int? Number { get; }
-    public string? Text { get; }
+    public readonly int Number;
+    public readonly string OriginalLine;
+    public readonly int TextOffset;
+    public readonly int TextLength;
 
-    public FileLineRecord(int? number, string? text)
+    public FileLineRecord(int number, string originalLine, int textOffset, int textLength)
     {
         Number = number;
-        Text = text;
+        OriginalLine = originalLine;
+        TextOffset = textOffset;
+        TextLength = textLength;
     }
 
     public int CompareTo(FileLineRecord other)
     {
-        int cmp = CompareNullableStrings(Text, other.Text);
+        ReadOnlySpan<char> thisText = OriginalLine.AsSpan(TextOffset, TextLength);
+        ReadOnlySpan<char> otherText = other.OriginalLine.AsSpan(other.TextOffset, other.TextLength);
+        int cmp = thisText.CompareTo(otherText, StringComparison.OrdinalIgnoreCase);
         if (cmp != 0) return cmp;
-        return CompareNullableInts(Number, other.Number);
+        return Number.CompareTo(other.Number);
     }
 
-    private static int CompareNullableStrings(string? a, string? b)
-    {
-        if (a is null && b is null) return 0;
-        if (a is null) return -1;
-        if (b is null) return 1;
-        return string.Compare(a, b, StringComparison.CurrentCultureIgnoreCase);
-    }
-
-    private static int CompareNullableInts(int? a, int? b)
-    {
-        if (a is null && b is null) return 0;
-        if (a is null) return -1;
-        if (b is null) return 1;
-        return a.Value.CompareTo(b.Value);
-    }
-
-    public override string ToString() => $"{Number?.ToString() ?? ""}. {Text ?? ""}";
+    public override string ToString() => OriginalLine;
 
     public static bool TryParse(string line, out FileLineRecord record)
     {
         record = default;
-        if (line is null) return false;
-        
-        int dotIndex = line.IndexOf('.');
+        if (string.IsNullOrEmpty(line))
+            return false;
+
+        line = line.TrimEnd('\r', '\n');
+
+        ReadOnlySpan<char> span = line.AsSpan();
+        int dotIndex = span.IndexOf('.');
         if (dotIndex < 0)
             return false;
 
-        string numberPart = line[..dotIndex].Trim();
-        string textPart = line[(dotIndex + 1)..].Trim();
+        ReadOnlySpan<char> numberSpan = span.Slice(0, dotIndex).Trim();
+        if (!int.TryParse(numberSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out int number))
+            return false;
 
-        int? number = null;
-        if (!string.IsNullOrEmpty(numberPart))
-        {
-            if (int.TryParse(numberPart, out int n))
-                number = n;
-            else
-                return false;
-        }
+        int start = dotIndex + 1;
+        while (start < line.Length && char.IsWhiteSpace(line[start]))
+            start++;
+        int textLength = line.Length - start;
 
-        string? text = string.IsNullOrEmpty(textPart) ? null : textPart;
+        if (textLength <= 0)
+            return false;
 
-        record = new FileLineRecord(number, text);
-
+        record = new FileLineRecord(number, line, start, textLength);
         return true;
     }
 }
 
 public class FileLineRecordComparer : IComparer<FileLineRecord>
 {
-    public int Compare(FileLineRecord x, FileLineRecord y) => x.CompareTo(y);
+    public int Compare(FileLineRecord x, FileLineRecord y)
+    {
+        return x.CompareTo(y);
+    }
 }
