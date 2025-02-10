@@ -24,7 +24,7 @@ To create a test file with numbers, use:
 ```
 Example:
 ```sh
- dotnet run --project test-file-generator-app data.txt 1000000
+ dotnet run --project test-file-generator-app data.txt 1000000 --configuration Release
 ```
 This will generate a file `data.txt` of approximately 1MB in size.
 
@@ -36,12 +36,6 @@ After generating the file, you can sort it using:
 ```
 Example:
 ```sh
- dotnet run --project file-sorting-app data.txt sorted_data.txt
+ dotnet run --project file-sorting-app data.txt sorted_data.txt --configuration Release
 ```
-As a result, `sorted_data.txt` will contain the sorted file data.
-
-## Troubleshooting
-
-- **Not enough arguments** → Ensure you provide two arguments (file and size/output file).
-- **Not enough free space** → Check if there is enough disk space to generate the file.
-- **File not found** → Verify the correct path to the input file.
+As a result, `sorted_data.txt` will contain the sorted data.
