@@ -1,4 +1,3 @@
-using System.Threading.Channels;
 using FileSorting.IO;
 
 namespace FileSorting;
@@ -12,103 +11,45 @@ public class KWayMergePipeline
         _config = config;
     }
 
-    public async Task MergeAllAsync()
+    public async Task MergeAllAsync(CancellationToken cancellationToken = default)
     {
-        var chunkFiles = Directory.GetFiles(_config.TempDirectory, "chunk_*.txt").ToList();
-        if (chunkFiles.Count == 0)
-            throw new Exception("Нет чанков для слияния.");
+        var chunkFiles = Directory.GetFiles(_config.TempDirectory, "chunk_*.txt");
 
-        while (chunkFiles.Count > _config.MergeDegree)
-        {
-            var intermediateFiles = new List<string>();
-            var groups = chunkFiles
-                .Select((file, index) => new { file, index })
-                .GroupBy(x => x.index / _config.MergeDegree)
-                .Select(g => g.Select(x => x.file).ToList())
-                .ToList();
+        if (chunkFiles.Length == 0)
+            throw new Exception("No chunk files exist.");
 
-            var mergeTasks = groups.Select(async group =>
-            {
-                string intermFile = Path.Combine(_config.TempDirectory, $"merged_{Guid.NewGuid()}.txt");
-                intermediateFiles.Add(intermFile);
-                await MergeAsync(group, intermFile);
-            }).ToArray();
-
-            await Task.WhenAll(mergeTasks);
-            foreach (var file in chunkFiles)
-            {
-                try { File.Delete(file); } catch { }
-            }
-            chunkFiles = intermediateFiles;
-        }
-
-        await MergeAsync(chunkFiles, _config.OutputFile);
-        foreach (var file in chunkFiles)
-        {
-            if (!string.Equals(file, _config.OutputFile, StringComparison.OrdinalIgnoreCase))
-                try { File.Delete(file); } catch { }
-        }
+        await MergeAsync(chunkFiles, _config.OutputFile, cancellationToken);
     }
 
-    public async Task MergeAsync(List<string> inputFiles, string outputFile)
+    private async Task MergeAsync(string[] inputFiles, string outputFile, CancellationToken cancellationToken = default)
     {
-        var outputChannel = Channel.CreateUnbounded<FileLineRecord>();
-        Task mergeTask = MergeFilesAsync(inputFiles, outputChannel);
-        Task writeTask = WriteOutputAsync(outputChannel, outputFile);
-        await Task.WhenAll(mergeTask, writeTask);
-    }
-
-    private async Task MergeFilesAsync(List<string> inputFiles, Channel<FileLineRecord> outputChannel)
-    {
-        int fileCount = inputFiles.Count;
-        var batchReaders = new BatchReader[fileCount];
-        for (int i = 0; i < fileCount; i++)
+        await using var writer = new BufferedWriter(outputFile, _config.BufferSize);
+        var priorityQueue = new PriorityQueue<(FileLineRecord Record, int EnumeratorIndex), FileLineRecord>(new FileLineRecordComparer());
+       
+        var enumerators = new List<IAsyncEnumerator<FileLineRecord>>();
+        foreach (var file in inputFiles)
         {
-            batchReaders[i] = new BatchReader(inputFiles[i], _config.BufferSize, _config.BatchLineCount, _config.PrefetchBufferSize);
-            batchReaders[i].StartReading();
+            var reader = new BufferedReader(file, _config.BufferSize);
+            enumerators.Add(reader.ReadRecordsAsync(cancellationToken).GetAsyncEnumerator(cancellationToken));
         }
 
-        var priorityQueue = new PriorityQueue<(FileLineRecord Record, int ReaderIndex), FileLineRecord>(new FileLineRecordComparer());
-        for (int i = 0; i < fileCount; i++)
+        for (int i = 0; i < enumerators.Count; i++)
         {
-            if (await batchReaders[i].Reader.WaitToReadAsync())
-            {
-                if (batchReaders[i].Reader.TryRead(out var record))
-                    priorityQueue.Enqueue((record, i), record);
-            }
+            if (await enumerators[i].MoveNextAsync().ConfigureAwait(false))
+                priorityQueue.Enqueue((enumerators[i].Current, i), enumerators[i].Current);
         }
 
         while (priorityQueue.Count > 0)
         {
-            var (record, readerIndex) = priorityQueue.Dequeue();
-            await outputChannel.Writer.WriteAsync(record);
-            if (await batchReaders[readerIndex].Reader.WaitToReadAsync())
-            {
-                if (batchReaders[readerIndex].Reader.TryRead(out var nextRecord))
-                    priorityQueue.Enqueue((nextRecord, readerIndex), nextRecord);
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            var (record, idx) = priorityQueue.Dequeue();
+            await writer.WriteRecordAsync(record, cancellationToken).ConfigureAwait(false);
+
+            if (await enumerators[idx].MoveNextAsync().ConfigureAwait(false))
+                priorityQueue.Enqueue((enumerators[idx].Current, idx), enumerators[idx].Current);
         }
 
-        foreach (var br in batchReaders)
-            await br.DisposeAsync();
-
-        outputChannel.Writer.Complete();
-    }
-
-    private async Task WriteOutputAsync(Channel<FileLineRecord> outputChannel, string outputFile)
-    {
-        await using var writer = new BatchWriter(outputFile, _config.BufferSize);
-        var outputBuffer = new List<FileLineRecord>(_config.OutputBufferSize);
-        await foreach (var record in outputChannel.Reader.ReadAllAsync())
-        {
-            outputBuffer.Add(record);
-            if (outputBuffer.Count >= _config.OutputBufferSize)
-            {
-                await writer.WriteAsync(outputBuffer);
-                outputBuffer.Clear();
-            }
-        }
-        if (outputBuffer.Count > 0)
-            await writer.WriteAsync(outputBuffer);
+        foreach (var enumerator in enumerators)
+            await enumerator.DisposeAsync().ConfigureAwait(false);
     }
 }

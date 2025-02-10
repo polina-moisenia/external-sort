@@ -1,6 +1,7 @@
 using System.Globalization;
 
 namespace FileSorting.IO;
+
 public readonly struct FileLineRecord : IComparable<FileLineRecord>
 {
     public readonly int Number;

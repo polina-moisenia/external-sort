@@ -20,7 +20,7 @@ Open a terminal in the root directory and run:
 
 To create a test file with numbers, use:
 ```sh
- dotnet run --project test-file-generator-app <filename> <size_in_bytes>
+ dotnet run --project test-file-generator-app <filename> <size_in_bytes> --configuration Release
 ```
 Example:
 ```sh
@@ -32,7 +32,7 @@ This will generate a file `data.txt` of approximately 1MB in size.
 
 After generating the file, you can sort it using:
 ```sh
- dotnet run --project file-sorting-app <input_file> <output_file>
+ dotnet run --project file-sorting-app <input_file> <output_file> --configuration Release
 ```
 Example:
 ```sh

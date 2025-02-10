@@ -17,16 +17,12 @@ public class ChunkSorterPipeline
     {
         Stopwatch sw = Stopwatch.StartNew();
 
-        var sortBlock = new TransformBlock<(int, List<string>), (int, List<FileLineRecord>)>(chunk =>
+        var sortBlock = new TransformBlock<(int, List<FileLineRecord>), (int, List<FileLineRecord>)>(chunk =>
         {
-            var records = new List<FileLineRecord>(chunk.Item2.Count);
-            foreach (var line in chunk.Item2)
-            {
-                if (FileLineRecord.TryParse(line, out var record))
-                    records.Add(record);
-            }
-            records.Sort();
-            return (chunk.Item1, records);
+            cancellationToken.ThrowIfCancellationRequested();
+            
+            chunk.Item2.Sort();
+            return chunk;
         }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = _config.MaxParallelSort });
 
         var writeBlock = new ActionBlock<(int, List<FileLineRecord>)>(async chunk =>
@@ -35,25 +31,23 @@ public class ChunkSorterPipeline
             await using var writer = new BufferedWriter(chunkFile, _config.BufferSize);
             foreach (var record in chunk.Item2)
             {
-                await writer.WriteLineAsync(record.ToString()).ConfigureAwait(false);
+                await writer.WriteRecordAsync(record, cancellationToken).ConfigureAwait(false);
             }
-            await writer.FlushAsync().ConfigureAwait(false);
         }, new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = _config.MaxParallelWrite });
 
         sortBlock.LinkTo(writeBlock, new DataflowLinkOptions { PropagateCompletion = true });
 
-        using var reader = new BufferedReader(_config.InputFile, _config.BufferSize);
+        var reader = new BufferedReader(_config.InputFile, _config.BufferSize);
         int chunkIndex = 0;
-        var chunk = new List<string>(_config.ChunkSize);
-        string? line;
+        var chunk = new List<FileLineRecord>(_config.ChunkSize);
 
-        while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null && !cancellationToken.IsCancellationRequested)
+        await foreach (var record in reader.ReadRecordsAsync(cancellationToken).ConfigureAwait(false))
         {
-            chunk.Add(line);
-            if (chunk.Count >= _config.ChunkSize)
+            chunk.Add(record);
+            if (chunk.Count == _config.ChunkSize)
             {
                 sortBlock.Post((chunkIndex++, chunk));
-                chunk = new List<string>(_config.ChunkSize);
+                chunk = new List<FileLineRecord>(_config.ChunkSize);
             }
         }
         if (chunk.Count > 0) sortBlock.Post((chunkIndex++, chunk));
