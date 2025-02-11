@@ -34,8 +34,6 @@ public readonly struct FileLineRecord : IComparable<FileLineRecord>
         if (string.IsNullOrEmpty(line))
             return false;
 
-        line = line.TrimEnd('\r', '\n');
-
         ReadOnlySpan<char> span = line.AsSpan();
         int dotIndex = span.IndexOf('.');
         if (dotIndex < 0)

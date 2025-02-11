@@ -16,7 +16,7 @@ namespace FileSorting
             FileSortingConfiguration config = null;
             try
             {
-                config = FileSortingConfiguration.CreateConfiguration(inputFile, outputFile);
+                config = new FileSortingConfiguration(inputFile, outputFile);
 
                 Console.WriteLine("Sorting started with config:");
                 Console.WriteLine($"  InputFile:           {config.InputFile}");

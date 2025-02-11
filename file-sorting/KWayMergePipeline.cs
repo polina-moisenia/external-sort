@@ -18,14 +18,24 @@ public class KWayMergePipeline
         if (chunkFiles.Length == 0)
             throw new Exception("No chunk files exist.");
 
-        await MergeAsync(chunkFiles, _config.OutputFile, cancellationToken);
+        if (chunkFiles.Length == 1)
+        {
+            if (File.Exists(_config.OutputFile))
+            {
+                File.Delete(_config.OutputFile);
+            }
+            File.Move(chunkFiles[0], _config.OutputFile);
+            return;
+        }
+
+        await MergeAsync(chunkFiles, cancellationToken);
     }
 
-    private async Task MergeAsync(string[] inputFiles, string outputFile, CancellationToken cancellationToken = default)
+    private async Task MergeAsync(string[] inputFiles, CancellationToken cancellationToken = default)
     {
-        await using var writer = new BufferedWriter(outputFile, _config.BufferSize);
+        await using var writer = new BufferedWriter(_config.OutputFile, _config.BufferSize);
         var priorityQueue = new PriorityQueue<(FileLineRecord Record, int EnumeratorIndex), FileLineRecord>(new FileLineRecordComparer());
-       
+
         var enumerators = new List<IAsyncEnumerator<FileLineRecord>>();
         foreach (var file in inputFiles)
         {

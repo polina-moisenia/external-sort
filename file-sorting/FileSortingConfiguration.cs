@@ -10,7 +10,7 @@ public class FileSortingConfiguration
     public int MaxParallelSort { get; }
     public int MaxParallelWrite { get; }
 
-    public FileSortingConfiguration(string inputFile, string outputFile, int chunkSize, int bufferSize)
+    public FileSortingConfiguration(string inputFile, string outputFile)
     {
         InputFile = inputFile;
         OutputFile = outputFile;
@@ -18,19 +18,18 @@ public class FileSortingConfiguration
         TempDirectory = Path.Combine(dir, "output_chunks");
         Directory.CreateDirectory(TempDirectory);
 
-        ChunkSize = chunkSize;
-        BufferSize = bufferSize;
+        FileInfo fi = new FileInfo(inputFile);
+        long fileSize = fi.Length;
+
+        if(fileSize < 25_000_000_000) {
+            ChunkSize = Math.Max((int)(fileSize / 1000), 1_000_000);
+        } else {
+            ChunkSize = (int)(fileSize / 5000);
+        }
+
+        BufferSize = 1024 * 1024 * 10;
 
         MaxParallelSort = Environment.ProcessorCount;
         MaxParallelWrite = Math.Max(6, Environment.ProcessorCount / 4);
-    }
-
-    public static FileSortingConfiguration CreateConfiguration(string inputFile, string outputFile)
-    {
-        FileInfo fi = new FileInfo(inputFile);
-        long fileSize = fi.Length; // bytes
-        //TODO
-
-        return new FileSortingConfiguration(inputFile, outputFile, 10_000_000, 1024 * 1024 * 32);
     }
 }
