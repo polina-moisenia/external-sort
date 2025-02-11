@@ -18,7 +18,7 @@ public class FileSortingConfiguration
         TempDirectory = Path.Combine(dir, "output_chunks");
         Directory.CreateDirectory(TempDirectory);
 
-        FileInfo fi = new FileInfo(inputFile);
+        FileInfo fi = new(inputFile);
         long fileSize = fi.Length;
 
         if(fileSize < 25_000_000_000) {

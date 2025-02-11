@@ -2,27 +2,21 @@ using System.Globalization;
 
 namespace FileSorting.IO;
 
-public readonly struct FileLineRecord : IComparable<FileLineRecord>
+public readonly struct FileLineRecord(int number, string originalLine, int textOffset, int textLength) : IComparable<FileLineRecord>
 {
-    public readonly int Number;
-    public readonly string OriginalLine;
-    public readonly int TextOffset;
-    public readonly int TextLength;
-
-    public FileLineRecord(int number, string originalLine, int textOffset, int textLength)
-    {
-        Number = number;
-        OriginalLine = originalLine;
-        TextOffset = textOffset;
-        TextLength = textLength;
-    }
+    public readonly int Number = number;
+    public readonly string OriginalLine = originalLine;
+    public readonly int TextOffset = textOffset;
+    public readonly int TextLength = textLength;
 
     public int CompareTo(FileLineRecord other)
     {
-        ReadOnlySpan<char> thisText = OriginalLine.AsSpan(TextOffset, TextLength);
-        ReadOnlySpan<char> otherText = other.OriginalLine.AsSpan(other.TextOffset, other.TextLength);
+        var thisText = OriginalLine.AsSpan(TextOffset, TextLength);
+        var otherText = other.OriginalLine.AsSpan(other.TextOffset, other.TextLength);
+
         int cmp = thisText.CompareTo(otherText, StringComparison.OrdinalIgnoreCase);
         if (cmp != 0) return cmp;
+
         return Number.CompareTo(other.Number);
     }
 
@@ -34,12 +28,12 @@ public readonly struct FileLineRecord : IComparable<FileLineRecord>
         if (string.IsNullOrEmpty(line))
             return false;
 
-        ReadOnlySpan<char> span = line.AsSpan();
+        var span = line.AsSpan();
         int dotIndex = span.IndexOf('.');
         if (dotIndex < 0)
             return false;
 
-        ReadOnlySpan<char> numberSpan = span.Slice(0, dotIndex).Trim();
+        var numberSpan = span[..dotIndex].Trim();
         if (!int.TryParse(numberSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out int number))
             return false;
 

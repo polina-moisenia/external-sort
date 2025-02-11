@@ -2,14 +2,9 @@ using FileSorting.IO;
 
 namespace FileSorting;
 
-public class KWayMergePipeline
+public class KWayMergePipeline(FileSortingConfiguration config)
 {
-    private readonly FileSortingConfiguration _config;
-
-    public KWayMergePipeline(FileSortingConfiguration config)
-    {
-        _config = config;
-    }
+    private readonly FileSortingConfiguration _config = config;
 
     public async Task MergeAllAsync(CancellationToken cancellationToken = default)
     {
@@ -52,6 +47,7 @@ public class KWayMergePipeline
         while (priorityQueue.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
             var (record, idx) = priorityQueue.Dequeue();
             await writer.WriteRecordAsync(record, cancellationToken).ConfigureAwait(false);
 

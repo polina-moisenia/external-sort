@@ -3,16 +3,10 @@ using System.Text;
 
 namespace FileSorting.IO;
 
-public class BufferedReader
+public class BufferedReader(string filePath, int bufferSize)
 {
-    private readonly string _filePath;
-    private readonly int _bufferSize;
-
-    public BufferedReader(string filePath, int bufferSize)
-    {
-        _filePath = filePath;
-        _bufferSize = bufferSize;
-    }
+    private readonly string _filePath = filePath;
+    private readonly int _bufferSize = bufferSize;
 
     public async IAsyncEnumerable<FileLineRecord> ReadRecordsAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -23,7 +17,10 @@ public class BufferedReader
         while ((line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false)) != null)
         {
             if (FileLineRecord.TryParse(line, out var record))
+            {
                 yield return record;
+            }
+            else Console.WriteLine($"Line: \"{line}\" will not be sorted be sorted as it does not meet the requirements");
         }
     }
 }

@@ -4,14 +4,9 @@ using FileSorting.IO;
 
 namespace FileSorting;
 
-public class ChunkSorterPipeline
+public class ChunkSorterPipeline(FileSortingConfiguration config)
 {
-    private readonly FileSortingConfiguration _config;
-
-    public ChunkSorterPipeline(FileSortingConfiguration config)
-    {
-        _config = config;
-    }
+    private readonly FileSortingConfiguration _config = config;
 
     public async Task SplitAndSortChunksAsync(CancellationToken cancellationToken = default)
     {

@@ -13,21 +13,20 @@ namespace FileSorting
             }
 
             Stopwatch sw = Stopwatch.StartNew();
-            FileSortingConfiguration config = null;
+            var config = new FileSortingConfiguration(inputFile, outputFile);
+
+            Console.WriteLine("Sorting started with config:");
+            Console.WriteLine($"  InputFile:           {config.InputFile}");
+            Console.WriteLine($"  OutputFile:          {config.OutputFile}");
+            Console.WriteLine($"  TempDirectory:       {config.TempDirectory}");
+            Console.WriteLine($"  ChunkSize:           {config.ChunkSize}");
+            Console.WriteLine($"  Buffer size:         {config.BufferSize}");
+            Console.WriteLine($"  Parallel for sort:   {config.MaxParallelSort}");
+            Console.WriteLine($"  Parallel for write:  {config.MaxParallelWrite}");
+            Console.WriteLine();
+
             try
             {
-                config = new FileSortingConfiguration(inputFile, outputFile);
-
-                Console.WriteLine("Sorting started with config:");
-                Console.WriteLine($"  InputFile:           {config.InputFile}");
-                Console.WriteLine($"  OutputFile:          {config.OutputFile}");
-                Console.WriteLine($"  TempDirectory:       {config.TempDirectory}");
-                Console.WriteLine($"  ChunkSize:           {config.ChunkSize}");
-                Console.WriteLine($"  Buffer size:         {config.BufferSize}");                
-                Console.WriteLine($"  Parallel for sort:   {config.MaxParallelSort}");                
-                Console.WriteLine($"  Parallel for write:  {config.MaxParallelWrite}");
-                Console.WriteLine();
-
                 var chunkSorter = new ChunkSorterPipeline(config);
                 Console.WriteLine("Splitting and sorting chunks...");
                 await chunkSorter.SplitAndSortChunksAsync(cancellationToken).ConfigureAwait(false);
@@ -46,7 +45,7 @@ namespace FileSorting
             {
                 if (config != null && Directory.Exists(config.TempDirectory))
                 {
-                    try { Directory.Delete(config.TempDirectory, true); } 
+                    try { Directory.Delete(config.TempDirectory, true); }
                     catch (Exception ex) { Console.WriteLine($"Error deleting temp directory: {ex.Message}"); }
                 }
             }
